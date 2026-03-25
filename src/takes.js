@@ -85,6 +85,11 @@ class TakeManager {
     }
     if (metrics) {
       Object.assign(take.metrics, metrics);
+      // Auto-compute overall score if individual metrics are set but overall is 0
+      const m = take.metrics;
+      if (m.overallScore === 0 && (m.cameraSmoothness || m.positioningAccuracy || m.dialogueTiming)) {
+        m.overallScore = +(m.cameraSmoothness * 0.3 + m.positioningAccuracy * 0.35 + m.dialogueTiming * 0.35).toFixed(2);
+      }
     }
     return take;
   }

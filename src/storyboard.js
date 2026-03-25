@@ -29,19 +29,25 @@ function createCanvas(w, h) {
   return { canvas: rows, width: w, height: h };
 }
 
-function drawChar(canvas, x, y, ch) {
-  if (x >= 0 && x < canvas.width && y >= 0 && y < canvas.height) {
-    canvas[y][x] = ch;
+function drawChar(c, x, y, ch) {
+  const rows = c.canvas ?? c;
+  const w = c.width ?? rows[0]?.length ?? 0;
+  const h = c.height ?? rows.length;
+  if (x >= 0 && x < w && y >= 0 && y < h) {
+    rows[y][x] = ch;
   }
 }
 
 function drawLabel(canvas, x, y, text) {
-  for (let i = 0; i < text.length && x + i < canvas.width; i++) {
+  for (let i = 0; i < text.length && x + i < (canvas.width ?? 0); i++) {
     drawChar(canvas, x + i, y, text[i]);
   }
 }
 
 function drawBox(canvas, x1, y1, x2, y2, ch = '─', corner = '+') {
+  // Clamp to canvas bounds
+  x1 = Math.max(0, x1); y1 = Math.max(0, y1);
+  x2 = Math.min(canvas.width - 1, x2); y2 = Math.min(canvas.height - 1, y2);
   for (let x = x1; x <= x2; x++) {
     drawChar(canvas, x, y1, ch);
     drawChar(canvas, x, y2, ch);
@@ -56,8 +62,9 @@ function drawBox(canvas, x1, y1, x2, y2, ch = '─', corner = '+') {
   drawChar(canvas, x2, y2, corner);
 }
 
-function renderCanvas(canvas) {
-  return canvas.map(row => row.join('')).join('\n');
+function renderCanvas(c) {
+  const rows = c.canvas ?? c;
+  return rows.map(row => row.join('')).join('\n');
 }
 
 /**
