@@ -2,9 +2,83 @@
 
 > **AI-Powered Minecraft Filmmaking Studio**
 
-CraftMind Studio transforms Minecraft into a virtual film set where AI agents serve as actors, directors, and crew. Give it a creative brief, and it generates cinematic content — shot lists, character dialogue, camera movements, voice synthesis, and rendered video.
+CraftMind Studio transforms Minecraft into a virtual film set where AI agents serve as actors, directors, and crew. Give it a creative brief, and it generates cinematic content — shot lists, character dialogue, smart camera movements, storyboards, sound design, and rendered video.
 
-> ⚠️ This is NOT a simple screen recorder. It's an AI director that understands storytelling structure, controls Minecraft bots as actors, and produces cinematic content end-to-end.
+> ⚠️ This is NOT a simple screen recorder. It's an AI director that understands storytelling structure, cinematography rules, controls Minecraft bots as actors, and produces cinematic content end-to-end.
+
+---
+
+## ✨ What's New
+
+### 🎥 Shot Composition Engine
+Smart camera placement using real cinematography rules:
+- **Rule of thirds** — subjects automatically positioned at power points
+- **180-degree rule** — enforces camera side across dialogue scenes
+- **Leading lines** — uses environment geometry for dynamic framing
+- **Depth of field** — aperture control per shot type (shallow for close-ups, deep for wides)
+- **Mood-based DOF** — romantic scenes get shallower DOF, epic scenes get deeper
+
+### 🎬 Set Design API
+Set up Minecraft world state before filming:
+- Place blocks (floors, walls, props, lighting)
+- Spawn named mobs/actors
+- Control time of day and weather
+- Built-in presets: Dialogue Set, Dark Cave, Sunset Village, Battle Arena
+- Full setup/cleanup command generation
+- SceneGraph for managing multiple sets
+
+### 🎭 Dialogue Beat System
+Sync dialogue to action beats with natural pacing:
+- 5 pacing profiles: conversational, intense, relaxed, dramatic, comedic
+- Emotion-adjusted speaking rates (fear → fast, awe → slow)
+- Automatic pause calculation before/after lines
+- SRT subtitle generation
+- Action beat interleaving (SFX, camera moves synced to dialogue)
+
+### 📋 Storyboard Generator
+Visual ASCII art storyboards from shot lists:
+- Top-down view with rule-of-thirds grid overlay
+- Side view showing camera height and depth
+- Character positions with emoji markers
+- Camera angle lines and director's notes
+- Full storyboard export to text file
+
+### 🎬 Takes & Retakes
+Record multiple takes and pick the best:
+- Start/complete/discard takes per scene
+- Quality metrics: camera smoothness, positioning accuracy, dialogue timing
+- Automatic best-take selection
+- Per-metric best selection (smoothest camera, best timing, etc.)
+- Take comparison reports
+
+### 🎞 Post-Production Pipeline
+Full post-production in ffmpeg:
+- Transitions: cut, fade, dissolve, dip-to-black, whip
+- Title cards with custom text and subtitles
+- Scrolling credits (cast, crew, special thanks)
+- Letterboxing for cinematic aspect ratios (2.39:1, 16:9, 4:3, 1:1)
+- Export formats: MP4, WebM, GIF, PNG sequence
+- Quality presets: draft (15fps 540p), standard (24fps 1080p), cinematic (24fps 1440p)
+
+### 🔊 Sound Design System
+Minecraft sound library with biome-aware audio:
+- 60+ sound mappings across 8 categories
+- Ambient sounds per biome (plains, forest, desert, cave, ocean, nether, end, jungle, swamp, mountains)
+- Footstep sync per block material (stone, grass, wood, gravel, sand, snow, metal)
+- Combat sounds (sword hits, explosions, creeper priming, shield blocks)
+- Environmental sounds (doors, water, weather)
+- Mob sounds (zombie, skeleton, spider, enderman, villager, wolf, cat)
+- Automatic sound plan generation from scene description
+
+### 🖥 Web UI
+Visual timeline editor in the browser:
+- Drag-and-drop shot reordering
+- Mood-colored timeline blocks
+- Playhead with keyboard controls (Space, arrows)
+- Shot detail panel with inline editing
+- Import/export timeline JSON
+- Demo project built-in
+- Runs at `node src/index.js serve`
 
 ---
 

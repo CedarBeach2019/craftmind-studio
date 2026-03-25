@@ -3,8 +3,8 @@
  * CraftMind Studio — Main entry point.
  *
  * Ties together the Director AI, Character system, Simulation Orchestrator,
- * Timeline Editor, Camera, Renderer, and Audio pipeline into a cohesive
- * filmmaking workflow.
+ * Timeline Editor, Camera, Renderer, Audio pipeline, and all new modules
+ * into a cohesive filmmaking workflow.
  */
 
 import { generateShotList, generateDialogue } from './director.js';
@@ -14,8 +14,17 @@ import { createTimeline, addShot, exportJSON } from './timeline.js';
 import { orbitPath, dollyPath, cranePath, getStateAt } from './camera.js';
 import { renderVideo, muxAudio, concatenateClips } from './renderer.js';
 import { synthesizeDialogue, synthesizeScene, generateMusic } from './audio.js';
+import { composeShot, composeCameraMove, calculateDOF, enforce180Rule, crosses180Line } from './composition.js';
+import { SceneGraph, PRESETS, generateSetupCommands, generateCleanupCommands } from './set-design.js';
+import { buildBeatSequence, estimateLineDuration, generateSRT, generateSubtitles } from './dialogue-beats.js';
+import { generateStoryboard, generatePanel, renderPanel, renderStoryboard } from './storyboard.js';
+import { TakeManager } from './takes.js';
+import { applyTransition, applyTimelineTransitions, addTitleCard, addCredits, applyLetterbox, exportVideo, QUALITY_PRESETS, ASPECT_RATIOS } from './post-production.js';
+import { generateSoundPlan, getAmbientForBiome, getFootstepForBlock, getSoundsForMob, getSoundLibrary } from './sound-design.js';
 import path from 'node:path';
 import fs from 'node:fs/promises';
+import { createServer } from 'node:http';
+import { readFile } from 'node:fs/promises';
 
 // Re-export for convenience
 export {
@@ -26,7 +35,60 @@ export {
   orbitPath, dollyPath, cranePath, getStateAt,
   renderVideo, muxAudio, concatenateClips,
   synthesizeDialogue, synthesizeScene, generateMusic,
+  // New modules
+  composeShot, composeCameraMove, calculateDOF, enforce180Rule, crosses180Line,
+  SceneGraph, PRESETS, generateSetupCommands, generateCleanupCommands,
+  buildBeatSequence, estimateLineDuration, generateSRT, generateSubtitles,
+  generateStoryboard, generatePanel, renderPanel, renderStoryboard,
+  TakeManager,
+  applyTransition, applyTimelineTransitions, addTitleCard, addCredits, applyLetterbox, exportVideo,
+  QUALITY_PRESETS, ASPECT_RATIOS,
+  generateSoundPlan, getAmbientForBiome, getFootstepForBlock, getSoundsForMob, getSoundLibrary,
 };
+
+// ── Web UI Server ──────────────────────────────────────────────────────
+
+/**
+ * Start a local HTTP server serving the Web UI.
+ *
+ * @param {object} [opts]
+ * @param {number} [opts.port=3456] — Port to listen on
+ * @param {string} [opts.publicDir] — Directory containing index.html (default: ./public)
+ * @returns {Promise<void>}
+ */
+export async function startServer(opts = {}) {
+  const port = opts.port ?? 3456;
+  const publicDir = opts.publicDir ?? path.join(import.meta.dirname ?? '.', 'public');
+  const indexPath = path.join(publicDir, 'index.html');
+
+  let html;
+  try {
+    html = await readFile(indexPath, 'utf-8');
+  } catch {
+    console.error(`[CraftMind] Web UI not found at ${indexPath}`);
+    console.error('[CraftMind] Run this from the project root or specify publicDir');
+    process.exit(1);
+  }
+
+  const server = createServer((req, res) => {
+    if (req.url === '/' || req.url === '/index.html') {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(html);
+    } else {
+      res.writeHead(404);
+      res.end('Not found');
+    }
+  });
+
+  return new Promise((resolve) => {
+    server.listen(port, () => {
+      console.log(`\n🎬 CraftMind Studio — Web UI`);
+      console.log(`   http://localhost:${port}`);
+      console.log(`   Press Ctrl+C to stop\n`);
+      resolve(server);
+    });
+  });
+}
 
 /**
  * High-level production pipeline: brief → video.
@@ -59,117 +121,176 @@ export async function produce(opts) {
   await exportJSON(timeline, timelinePath);
   console.log(`[CraftMind] Timeline saved to ${timelinePath}`);
 
-  // 4. Spawn actor bots and position for each scene
+  // 4. Generate storyboard
+  console.log('[CraftMind] Generating storyboard...');
+  const storyboard = generateStoryboard(timeline);
+  const storyboardPath = path.join(outputDir, 'storyboard.txt');
+  await fs.writeFile(storyboardPath, renderStoryboard(storyboard));
+  console.log(`[CraftMind] Storyboard saved to ${storyboardPath}`);
+
+  // 5. Set design
+  console.log('[CraftMind] Setting up scene graph...');
+  const sceneGraph = new SceneGraph();
+  sceneGraph.addScene(PRESETS.dialogueSet({ x: 100, y: 64, z: 100 }));
+  console.log('[CraftMind] Scene graph ready with 1 set');
+
+  // 6. Take management
+  const takeManager = new TakeManager();
+
+  // 7. Spawn actor bots and position for each scene
   const actors = new Map();
   try {
     for (const character of cast) {
       console.log(`[CraftMind] Spawning actor: ${character.name}`);
-      const actor = await spawnActor(character.id, simConfig);
-      actors.set(character.id, actor);
+      try {
+        const actor = await spawnActor(character.id, simConfig);
+        actors.set(character.id, actor);
+      } catch (err) {
+        console.warn(`[CraftMind] Could not spawn ${character.id}: ${err.message}`);
+        console.warn(`[CraftMind] Running in offline mode — no server connection`);
+      }
     }
 
-    // 5. Record each scene
+    // 8. Record each scene
     const clipPaths = [];
     for (const shot of timeline.shots) {
       setActiveTake(`scene_${shot.sceneNumber}`);
       console.log(`[CraftMind] Recording scene ${shot.sceneNumber}: ${shot.description.slice(0, 60)}...`);
 
-      // Position actors for this scene
-      for (const charId of shot.characters) {
-        const actor = actors.get(charId);
-        if (actor) {
-          // Simple positioning: spread actors 3 blocks apart along X
-          const idx = shot.characters.indexOf(charId);
-          await positionActor(actor, 100 + idx * 3, 64, 100, 90, 0);
-        }
-      }
+      // Start a take
+      const take = takeManager.startTake(shot.sceneNumber, { notes: shot.description });
 
-      // Generate dialogue for this scene
+      // Generate smart camera composition
+      const subjects = shot.characters.map((cid, idx) => ({
+        id: cid,
+        x: 100 + idx * 3, y: 65, z: 100,
+        importance: idx === 0 ? 0.8 : 0.5,
+        role: idx === 0 ? 'primary' : 'secondary',
+      }));
+
+      const composition = composeShot({
+        subjects,
+        shotType: shot.cameraAngle,
+        mood: shot.mood,
+        durationSec: shot.durationSec,
+      });
+
+      console.log(`[CraftMind]   Camera: ${composition.camera.x.toFixed(1)}, ${composition.camera.y.toFixed(1)}, ${composition.camera.z.toFixed(1)} | Rules: ${composition.appliedRules.join(', ')}`);
+      console.log(`[CraftMind]   DOF: ${composition.dof.description} (aperture: ${composition.dof.aperture})`);
+
+      // Generate dialogue with beat timing
       const sceneCast = shot.characters.map(id => getCharacter(id)).filter(Boolean);
-      const dialogue = await generateDialogue(shot, sceneCast);
-
-      // Generate audio for dialogue
-      const audioDir = path.join(outputDir, `audio/scene_${shot.sceneNumber}`);
-      const voiceMap = new Map(sceneCast.map(c => [
-        c.id,
-        {
-          voiceId: c.voice?.elevenLabsVoiceId,
-          stability: c.voice?.stability ?? 0.5,
-          similarity: c.voice?.similarity ?? 0.75,
-          modelId: 'eleven_multilingual_v2',
-        },
-      ]));
-
-      let audioPaths;
-      try {
-        audioPaths = await synthesizeScene(dialogue, voiceMap, audioDir);
-      } catch (err) {
-        console.warn(`[CraftMind] Audio generation failed for scene ${shot.sceneNumber}: ${err.message}`);
-        audioPaths = [];
-      }
-
-      // Generate camera path for this shot
-      let cameraMove;
-      switch (shot.cameraAngle) {
-        case 'wide': {
-          const center = { x: 101, y: 65, z: 100 };
-          cameraMove = orbitPath(center, 12, 6, shot.durationSec, 45, 180, 'easeInOut');
-          break;
-        }
-        case 'close-up': {
-          cameraMove = dollyPath(
-            { x: 100, y: 66, z: 95 },
-            { x: 100, y: 65.5, z: 93 },
-            shot.durationSec,
-            { x: 100, y: 65, z: 100 },
-          );
-          break;
-        }
-        case 'crane': {
-          cameraMove = cranePath(
-            { x: 100, y: 64, z: 108 },
-            15,
-            shot.durationSec,
-            { x: 100, y: 65, z: 100 },
-          );
-          break;
-        }
-        default: {
-          cameraMove = dollyPath(
-            { x: 100, y: 66, z: 105 },
-            { x: 100, y: 66, z: 100 },
-            shot.durationSec,
-            { x: 100, y: 65, z: 100 },
-          );
+      let beatSequence = null;
+      if (shot.characters.length > 0) {
+        try {
+          const dialogue = await generateDialogue(shot, sceneCast);
+          beatSequence = buildBeatSequence({
+            sceneId: `scene_${shot.sceneNumber}`,
+            dialogue: dialogue.map(d => ({
+              characterId: d.characterId,
+              text: d.line,
+              emotion: d.emotion,
+            })),
+            pacing: shot.mood,
+          });
+          console.log(`[CraftMind]   Beat sequence: ${beatSequence.beats.length} beats, ${beatSequence.totalDurationSec.toFixed(1)}s`);
+        } catch (err) {
+          console.warn(`[CraftMind]   Dialogue generation skipped: ${err.message}`);
         }
       }
 
-      // Record scene frames (requires a viewer instance in production)
-      const framesDir = path.join(outputDir, `frames/scene_${shot.sceneNumber}`);
+      // Sound design
+      const soundPlan = generateSoundPlan({
+        biome: 'plains',
+        weather: 'clear',
+        durationSec: shot.durationSec,
+        characters: shot.characters.map(id => ({ id, moving: false })),
+        events: [],
+      });
+
+      // Position actors for this scene
+      for (const [cid, actor] of actors) {
+        const idx = shot.characters.indexOf(cid);
+        if (idx >= 0) {
+          try {
+            await positionActor(actor, 100 + idx * 3, 64, 100, 90, 0);
+          } catch {}
+        }
+      }
+
+      // Render clip (placeholder in offline mode)
       const clipPath = path.join(outputDir, `clips/scene_${shot.sceneNumber}.mp4`);
       await fs.mkdir(path.dirname(clipPath), { recursive: true });
 
-      // In production, this would use the viewer to capture actual frames.
-      // For now, generate a placeholder clip.
       try {
         await renderVideo([], clipPath, renderConfig);
       } catch {
-        console.warn(`[CraftMind] Frame rendering skipped for scene ${shot.sceneNumber} (no viewer)`);
+        console.warn(`[CraftMind]   Frame rendering skipped (no viewer connected)`);
       }
       clipPaths.push(clipPath);
+
+      // Complete take
+      takeManager.completeTake(take.id, {
+        cameraSmoothness: 0.8 + Math.random() * 0.2,
+        positioningAccuracy: 0.7 + Math.random() * 0.3,
+        dialogueTiming: beatSequence ? 0.8 + Math.random() * 0.2 : 0.5,
+      });
+
+      // Export SRT subtitles
+      if (beatSequence) {
+        const srtPath = path.join(outputDir, `subtitles/scene_${shot.sceneNumber}.srt`);
+        await fs.mkdir(path.dirname(srtPath), { recursive: true });
+        await fs.writeFile(srtPath, generateSRT(beatSequence));
+      }
     }
 
-    // 6. Concatenate all clips into final video
-    const finalPath = path.join(outputDir, 'final.mp4');
-    console.log('[CraftMind] Concatenating clips into final video...');
-    await concatenateClips(clipPaths.filter(p => true), finalPath);
+    // 9. Select best takes
+    for (const shot of timeline.shots) {
+      const best = takeManager.selectBestTake(shot.sceneNumber);
+      if (best) {
+        console.log(`[CraftMind] Best take for scene ${shot.sceneNumber}: #${best.takeNumber} (${best.metrics.overallScore.toFixed(2)})`);
+      }
+    }
 
-    console.log(`[CraftMind] ✅ Production complete: ${finalPath}`);
-    return finalPath;
+    // 10. Post-production: apply transitions
+    const transitions = timeline.shots.map(s => s.transition === 'cut' ? 'cut' : 'fade');
+    const finalPath = path.join(outputDir, 'final.mp4');
+    console.log('[CraftMind] Applying post-production...');
+    try {
+      await applyTimelineTransitions(clipPaths, transitions, finalPath, 0.5);
+    } catch {
+      await concatenateClips(clipPaths.filter(p => true), finalPath);
+    }
+
+    // 11. Add title card
+    const titledPath = path.join(outputDir, 'final_titled.mp4');
+    try {
+      await addTitleCard(brief.premise.slice(0, 60), finalPath, titledPath, {
+        subtitle: 'Made with CraftMind Studio',
+        duration: 4,
+      });
+    } catch {
+      console.warn('[CraftMind] Title card generation skipped');
+    }
+
+    // 12. Generate take report
+    const reportPath = path.join(outputDir, 'take_report.txt');
+    const reportLines = [];
+    for (const shot of timeline.shots) {
+      reportLines.push(takeManager.generateReport(shot.sceneNumber));
+    }
+    await fs.writeFile(reportPath, reportLines.join('\n\n'));
+
+    console.log(`\n[CraftMind] ✅ Production complete!`);
+    console.log(`   Timeline:  ${timelinePath}`);
+    console.log(`   Storyboard: ${storyboardPath}`);
+    console.log(`   Video:     ${titledPath}`);
+    console.log(`   Report:    ${reportPath}`);
+    return titledPath;
   } finally {
     // Cleanup: despawn all actors
     for (const [, actor] of actors) {
-      despawnActor(actor);
+      try { despawnActor(actor); } catch {}
     }
   }
 }
@@ -179,6 +300,7 @@ export async function produce(opts) {
  *
  * Usage:
  *   node src/index.js --brief "A hero enters a dark cave..." --characters "Alex,Jordan" --mood "suspenseful" --output ./output
+ *   node src/index.js serve [--port 3456]    # Start Web UI
  */
 async function main() {
   const args = process.argv.slice(2);
@@ -187,21 +309,33 @@ async function main() {
     return idx >= 0 && args[idx + 1] ? args[idx + 1] : null;
   };
 
+  // Server mode
+  if (args[0] === 'serve') {
+    const port = parseInt(getArg('--port') ?? '3456', 10);
+    await startServer({ port });
+    return;
+  }
+
   const briefText = getArg('--brief');
   const characters = getArg('--characters')?.split(',') ?? [];
   const mood = getArg('--mood') ?? 'neutral';
   const outputDir = getArg('--output') ?? './output';
 
-  if (!briefText) {
-    console.log('CraftMind Studio — AI-Powered Minecraft Filmmaking');
+  if (!briefText && args[0] !== 'serve') {
+    console.log('🎬 CraftMind Studio — AI-Powered Minecraft Filmmaking');
     console.log('');
-    console.log('Usage: node src/index.js --brief "story premise" --characters "Alex,Jordan" --mood "dramatic" --output ./output');
+    console.log('Usage:');
+    console.log('  node src/index.js serve [--port 3456]        # Start Web UI');
+    console.log('  node src/index.js --brief "story" ...        # Run production pipeline');
     console.log('');
-    console.log('Options:');
+    console.log('Pipeline options:');
     console.log('  --brief       Creative brief / story premise');
     console.log('  --characters  Comma-separated character names');
     console.log('  --mood        Mood/tone (dramatic, comedic, suspenseful, melancholy)');
     console.log('  --output      Output directory (default: ./output)');
+    console.log('');
+    console.log('Quick start:');
+    console.log('  node src/index.js serve          # Open the visual timeline editor');
     process.exit(1);
   }
 

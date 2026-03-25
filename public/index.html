@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CraftMind Studio — Timeline Editor</title>
+<style>
+:root {
+  --bg: #0d1117; --surface: #161b22; --border: #30363d;
+  --text: #e6edf3; --text-dim: #8b949e;
+  --accent: #58a6ff; --green: #3fb950; --red: #f85149;
+  --orange: #d29922; --purple: #bc8cff; --pink: #f778ba;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', -apple-system, sans-serif; background: var(--bg); color: var(--text); overflow-x: hidden; }
+
+/* ── Header ── */
+.header { display: flex; align-items: center; justify-content: space-between; padding: 12px 24px; border-bottom: 1px solid var(--border); background: var(--surface); }
+.header h1 { font-size: 18px; font-weight: 600; }
+.header h1 span { color: var(--accent); }
+.header-actions { display: flex; gap: 8px; }
+.btn { padding: 6px 14px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text); cursor: pointer; font-size: 13px; transition: all .15s; }
+.btn:hover { border-color: var(--accent); color: var(--accent); }
+.btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.btn-primary:hover { background: #79c0ff; }
+
+/* ── Layout ── */
+.app { display: flex; height: calc(100vh - 49px); }
+
+/* ── Sidebar ── */
+.sidebar { width: 280px; border-right: 1px solid var(--border); background: var(--surface); overflow-y: auto; flex-shrink: 0; }
+.sidebar-section { padding: 16px; border-bottom: 1px solid var(--border); }
+.sidebar-section h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-dim); margin-bottom: 10px; }
+.shot-list { display: flex; flex-direction: column; gap: 4px; }
+.shot-item { padding: 8px 10px; border-radius: 6px; cursor: grab; font-size: 13px; border: 1px solid transparent; transition: all .15s; }
+.shot-item:hover { background: #1c2128; border-color: var(--border); }
+.shot-item.active { background: #1c2128; border-color: var(--accent); }
+.shot-item .shot-num { color: var(--text-dim); font-size: 11px; }
+.shot-item .shot-type { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 10px; font-weight: 600; margin-left: 6px; }
+.shot-item.dragging { opacity: 0.4; }
+
+.beat-list { display: flex; flex-direction: column; gap: 6px; }
+.beat-item { padding: 6px 10px; border-radius: 4px; font-size: 12px; background: #1c2128; }
+.beat-item .beat-type { font-weight: 600; color: var(--accent); }
+.beat-item .beat-time { color: var(--text-dim); float: right; font-size: 11px; }
+
+/* ── Main Content ── */
+.main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+/* ── Preview Area ── */
+.preview { flex: 1; display: flex; align-items: center; justify-content: center; background: #000; position: relative; min-height: 200px; }
+.preview-empty { color: var(--text-dim); font-size: 14px; text-align: center; }
+.preview-info { position: absolute; top: 12px; left: 12px; font-size: 11px; color: var(--text-dim); background: rgba(0,0,0,0.7); padding: 4px 8px; border-radius: 4px; }
+.preview-mood { position: absolute; bottom: 12px; left: 12px; font-size: 12px; padding: 4px 10px; border-radius: 12px; background: rgba(0,0,0,0.7); }
+
+/* ── Timeline ── */
+.timeline-area { border-top: 2px solid var(--border); background: var(--surface); }
+.timeline-toolbar { display: flex; align-items: center; gap: 12px; padding: 8px 16px; border-bottom: 1px solid var(--border); }
+.timeline-toolbar .time { font-family: monospace; font-size: 14px; min-width: 80px; }
+.play-controls { display: flex; gap: 4px; }
+.play-btn { width: 32px; height: 32px; border: none; border-radius: 50%; background: transparent; color: var(--text); cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; }
+.play-btn:hover { background: #1c2128; }
+.play-btn.playing { color: var(--green); }
+
+.timeline-ruler { padding: 4px 16px 0; display: flex; position: relative; height: 24px; }
+.ruler-mark { position: absolute; font-size: 10px; color: var(--text-dim); font-family: monospace; transform: translateX(-50%); }
+.ruler-mark::before { content: ''; position: absolute; top: 16px; left: 50%; width: 1px; height: 6px; background: var(--border); }
+
+.timeline-tracks { display: flex; flex-direction: column; padding: 8px 16px; overflow-x: auto; }
+.track { display: flex; align-items: center; height: 48px; gap: 8px; }
+.track-label { width: 80px; font-size: 11px; color: var(--text-dim); text-transform: uppercase; flex-shrink: 0; }
+.track-content { flex: 1; position: relative; height: 100%; background: #0d1117; border-radius: 4px; overflow: hidden; }
+.track-playhead { position: absolute; top: 0; width: 2px; height: 100%; background: var(--red); z-index: 10; pointer-events: none; transition: left 0.1s linear; }
+
+/* Shot blocks on timeline */
+.shot-block { position: absolute; top: 4px; bottom: 4px; border-radius: 4px; cursor: pointer; display: flex; align-items: center; padding: 0 8px; font-size: 11px; font-weight: 500; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; transition: opacity .15s; min-width: 20px; }
+.shot-block:hover { opacity: 0.85; }
+.shot-block.selected { outline: 2px solid #fff; }
+
+/* Mood colors */
+.mood-wonder { background: rgba(88,166,255,0.3); border: 1px solid rgba(88,166,255,0.5); color: #79c0ff; }
+.mood-anticipation { background: rgba(210,153,34,0.3); border: 1px solid rgba(210,153,34,0.5); color: #d29922; }
+.mood-awe { background: rgba(188,140,255,0.3); border: 1px solid rgba(188,140,255,0.5); color: #bc8cff; }
+.mood-suspenseful { background: rgba(248,81,73,0.3); border: 1px solid rgba(248,81,73,0.5); color: #f85149; }
+.mood-triumphant { background: rgba(63,185,80,0.3); border: 1px solid rgba(63,185,80,0.5); color: #3fb950; }
+.mood-melancholy { background: rgba(139,148,158,0.3); border: 1px solid rgba(139,148,158,0.5); color: #8b949e; }
+.mood-neutral { background: rgba(139,148,158,0.2); border: 1px solid rgba(139,148,158,0.3); color: var(--text-dim); }
+
+/* ── Detail Panel ── */
+.detail-panel { position: absolute; right: 0; top: 49px; bottom: 0; width: 320px; background: var(--surface); border-left: 1px solid var(--border); transform: translateX(100%); transition: transform .2s; z-index: 20; overflow-y: auto; }
+.detail-panel.open { transform: translateX(0); }
+.detail-panel .close-btn { position: absolute; top: 12px; right: 12px; background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 18px; }
+.detail-panel h3 { padding: 16px; font-size: 14px; border-bottom: 1px solid var(--border); }
+.detail-field { padding: 12px 16px; border-bottom: 1px solid var(--border); }
+.detail-field label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; display: block; margin-bottom: 4px; }
+.detail-field .value { font-size: 14px; }
+.detail-field .value textarea { width: 100%; background: #0d1117; border: 1px solid var(--border); border-radius: 4px; color: var(--text); padding: 6px 8px; font-size: 13px; resize: vertical; font-family: inherit; }
+
+/* ── Drop zone ── */
+.drop-indicator { height: 2px; background: var(--accent); border-radius: 1px; margin: -1px 0; opacity: 0; transition: opacity .15s; }
+.drop-indicator.active { opacity: 1; }
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🎬 <span>CraftMind</span> Studio</h1>
+  <div class="header-actions">
+    <button class="btn" onclick="loadDemo()">Load Demo</button>
+    <button class="btn" onclick="importTimeline()">Import JSON</button>
+    <button class="btn btn-primary" onclick="exportTimeline()">Export JSON</button>
+  </div>
+</div>
+
+<div class="app">
+  <div class="sidebar">
+    <div class="sidebar-section">
+      <h3>Shots</h3>
+      <div class="shot-list" id="shotList"></div>
+    </div>
+    <div class="sidebar-section">
+      <h3>Selected Shot Beats</h3>
+      <div class="beat-list" id="beatList">
+        <div style="color:var(--text-dim);font-size:12px;">Select a shot to view beats</div>
+      </div>
+    </div>
+    <div class="sidebar-section">
+      <h3>Characters</h3>
+      <div id="charList" style="font-size:12px;color:var(--text-dim);">No characters</div>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="preview" id="preview">
+      <div class="preview-empty">No shot selected</div>
+      <div class="preview-info" id="previewInfo" style="display:none;"></div>
+      <div class="preview-mood" id="previewMood" style="display:none;"></div>
+    </div>
+    <div class="timeline-area">
+      <div class="timeline-toolbar">
+        <div class="play-controls">
+          <button class="play-btn" onclick="skipBack()" title="Skip back">⏮</button>
+          <button class="play-btn" id="playBtn" onclick="togglePlay()" title="Play/Pause">▶</button>
+          <button class="play-btn" onclick="skipForward()" title="Skip forward">⏭</button>
+        </div>
+        <span class="time" id="currentTime">00:00.0</span>
+        <span style="color:var(--text-dim);font-size:12px;">/</span>
+        <span class="time" id="totalTime" style="color:var(--text-dim);">00:00.0</span>
+        <div style="flex:1"></div>
+        <span style="font-size:12px;color:var(--text-dim);" id="shotCount">0 shots</span>
+      </div>
+      <div class="timeline-ruler" id="ruler"></div>
+      <div class="timeline-tracks" id="tracks">
+        <div class="track">
+          <div class="track-label">Video</div>
+          <div class="track-content" id="videoTrack">
+            <div class="track-playhead" id="playhead"></div>
+          </div>
+        </div>
+        <div class="track">
+          <div class="track-label">Audio</div>
+          <div class="track-content" id="audioTrack">
+            <div class="track-playhead" id="playheadAudio"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="detail-panel" id="detailPanel">
+    <button class="close-btn" onclick="closeDetail()">×</button>
+    <h3 id="detailTitle">Shot Details</h3>
+    <div class="detail-field"><label>Scene</label><div class="value" id="detailScene">—</div></div>
+    <div class="detail-field"><label>Camera</label><div class="value" id="detailCamera">—</div></div>
+    <div class="detail-field"><label>Beat</label><div class="value" id="detailBeat">—</div></div>
+    <div class="detail-field"><label>Mood</label><div class="value" id="detailMood">—</div></div>
+    <div class="detail-field"><label>Duration</label><div class="value" id="detailDuration">—</div></div>
+    <div class="detail-field"><label>Transition</label><div class="value" id="detailTransition">—</div></div>
+    <div class="detail-field"><label>Characters</label><div class="value" id="detailChars">—</div></div>
+    <div class="detail-field">
+      <label>Description</label>
+      <div class="value"><textarea id="detailDesc" rows="3"></textarea></div>
+    </div>
+    <div class="detail-field">
+      <label>Dialogue Hint</label>
+      <div class="value"><textarea id="detailDialogue" rows="2"></textarea></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── State ──
+let timeline = { title: 'Untitled', shots: [], totalDurationSec: 0 };
+let selectedShotIndex = -1;
+let isPlaying = false;
+let playbackTime = 0;
+let playInterval = null;
+const FPS = 24;
+
+// ── Demo Data ──
+const DEMO = {
+  title: 'The Hidden Temple',
+  shots: [
+    { sceneNumber: 1, description: 'Wide establishing shot of a dense jungle biome at golden hour', cameraAngle: 'wide', durationSec: 8, dialogueHint: 'Ambient jungle sounds only', mood: 'wonder', characters: [], transition: 'fade', beat: 'opening_image' },
+    { sceneNumber: 2, description: 'Alex pushes through vines, camera tracking alongside', cameraAngle: 'dolly', durationSec: 6, dialogueHint: 'Alex mutters to self', mood: 'anticipation', characters: ['alex'], transition: 'cut', beat: 'setup' },
+    { sceneNumber: 3, description: 'Jordan stands wary at the edge of the clearing', cameraAngle: 'medium', durationSec: 5, dialogueHint: 'Jordan expresses doubt', mood: 'suspenseful', characters: ['jordan'], transition: 'cut', beat: 'debate' },
+    { sceneNumber: 4, description: 'Alex and Jordan face each other, tension visible', cameraAngle: 'over-shoulder', durationSec: 10, dialogueHint: 'They argue about going forward', mood: 'suspenseful', characters: ['alex', 'jordan'], transition: 'cut', beat: 'catalyst' },
+    { sceneNumber: 5, description: 'Close-up of Alex\'s determined face as they make a decision', cameraAngle: 'close-up', durationSec: 4, dialogueHint: 'Alex: "We go forward."', mood: 'triumphant', characters: ['alex'], transition: 'dissolve', beat: 'break_into_two' },
+    { sceneNumber: 6, description: 'The temple doors slowly open revealing a glowing interior', cameraAngle: 'crane', durationSec: 8, dialogueHint: 'Both react with awe', mood: 'awe', characters: ['alex', 'jordan'], transition: 'fade', beat: 'fun_and_games' },
+  ],
+  characters: ['alex', 'jordan'],
+};
+
+// ── Rendering ──
+function render() {
+  renderShotList();
+  renderTimeline();
+  updateTotalTime();
+  updateShotCount();
+  if (selectedShotIndex >= 0) renderDetail();
+}
+
+function renderShotList() {
+  const el = document.getElementById('shotList');
+  el.innerHTML = timeline.shots.map((s, i) => {
+    const active = i === selectedShotIndex ? 'active' : '';
+    const typeColors = { wide: '#58a6ff', medium: '#d29922', 'close-up': '#f778ba', dolly: '#3fb950', crane: '#bc8cff', 'over-shoulder': '#f85149', 'low-angle': '#d29922', 'high-angle': '#58a6ff' };
+    const c = typeColors[s.cameraAngle] ?? '#8b949e';
+    return `<div class="shot-item ${active}" draggable="true" ondragstart="dragStart(event,${i})" ondragover="dragOver(event,${i})" ondrop="dropShot(event,${i})" onclick="selectShot(${i})">
+      <span class="shot-num">S${s.sceneNumber}</span>
+      <span class="shot-type" style="background:${c}22;color:${c};border:1px solid ${c}44;">${s.cameraAngle}</span>
+      <span style="margin-left:4px;">${s.description.slice(0, 30)}${s.description.length > 30 ? '…' : ''}</span>
+    </div>`;
+  }).join('');
+}
+
+function renderTimeline() {
+  // Recalculate offsets
+  let offset = 0;
+  for (const s of timeline.shots) {
+    s.startOffset = offset;
+    offset += s.durationSec;
+  }
+  timeline.totalDurationSec = offset;
+
+  const total = timeline.totalDurationSec || 1;
+  const pxPerSec = Math.max(8, (document.getElementById('videoTrack').offsetWidth - 20) / total);
+
+  // Ruler
+  const ruler = document.getElementById('ruler');
+  const interval = total <= 30 ? 5 : total <= 120 ? 15 : 30;
+  ruler.innerHTML = '';
+  for (let t = 0; t <= total; t += interval) {
+    const mark = document.createElement('div');
+    mark.className = 'ruler-mark';
+    mark.style.left = `${t * pxPerSec}px`;
+    mark.textContent = formatTime(t);
+    ruler.appendChild(mark);
+  }
+
+  // Shot blocks
+  const videoTrack = document.getElementById('videoTrack');
+  const audioTrack = document.getElementById('audioTrack');
+
+  // Keep playheads
+  const ph = document.getElementById('playhead');
+  const phA = document.getElementById('playheadAudio');
+
+  videoTrack.innerHTML = '';
+  audioTrack.innerHTML = '';
+
+  videoTrack.appendChild(ph);
+  audioTrack.appendChild(phA);
+
+  for (let i = 0; i < timeline.shots.length; i++) {
+    const s = timeline.shots[i];
+    const left = s.startOffset * pxPerSec;
+    const width = Math.max(20, s.durationSec * pxPerSec);
+    const moodClass = `mood-${s.mood}` || 'mood-neutral';
+    const selected = i === selectedShotIndex ? 'selected' : '';
+
+    const block = document.createElement('div');
+    block.className = `shot-block ${moodClass} ${selected}`;
+    block.style.left = `${left}px`;
+    block.style.width = `${width}px`;
+    block.textContent = `S${s.sceneNumber}`;
+    block.onclick = () => selectShot(i);
+    videoTrack.appendChild(block);
+
+    // Audio track (show dialogue indicator)
+    if (s.characters.length > 0 || s.dialogueHint) {
+      const audioBlock = document.createElement('div');
+      audioBlock.className = `shot-block mood-neutral`;
+      audioBlock.style.left = `${left}px`;
+      audioBlock.style.width = `${width}px`;
+      audioBlock.style.background = 'rgba(63,185,80,0.15)';
+      audioBlock.style.borderColor = 'rgba(63,185,80,0.3)';
+      audioBlock.textContent = s.characters.length > 0 ? `🎤 ${s.characters.join(', ')}` : '🎵';
+      audioTrack.appendChild(audioBlock);
+    }
+  }
+
+  updatePlayhead();
+}
+
+function renderDetail() {
+  if (selectedShotIndex < 0 || selectedShotIndex >= timeline.shots.length) return;
+  const s = timeline.shots[selectedShotIndex];
+  document.getElementById('detailTitle').textContent = `Scene ${s.sceneNumber}`;
+  document.getElementById('detailScene').textContent = s.sceneNumber;
+  document.getElementById('detailCamera').textContent = s.cameraAngle;
+  document.getElementById('detailBeat').textContent = s.beat ?? '—';
+  document.getElementById('detailMood').textContent = s.mood;
+  document.getElementById('detailDuration').textContent = `${s.durationSec}s`;
+  document.getElementById('detailTransition').textContent = s.transition;
+  document.getElementById('detailChars').textContent = s.characters.join(', ') || '—';
+  document.getElementById('detailDesc').value = s.description;
+  document.getElementById('detailDialogue').value = s.dialogueHint ?? '';
+
+  // Preview
+  const preview = document.getElementById('preview');
+  preview.innerHTML = `<div style="text-align:center;">
+    <div style="font-size:48px;margin-bottom:12px;">${getCameraEmoji(s.cameraAngle)}</div>
+    <div style="font-size:20px;font-weight:600;">Scene ${s.sceneNumber} — ${s.cameraAngle}</div>
+    <div style="color:var(--text-dim);margin-top:8px;max-width:500px;">${s.description}</div>
+    ${s.dialogueHint ? `<div style="color:var(--accent);margin-top:12px;font-style:italic;">"${s.dialogueHint}"</div>` : ''}
+  </div>`;
+  document.getElementById('previewInfo').style.display = 'block';
+  document.getElementById('previewInfo').textContent = `${s.beat ?? ''} · ${s.durationSec}s · ${s.transition}`;
+  document.getElementById('previewMood').style.display = 'block';
+  document.getElementById('previewMood').textContent = `🎭 ${s.mood}`;
+
+  // Characters
+  document.getElementById('charList').innerHTML = s.characters.length > 0
+    ? s.characters.map(c => `<div style="padding:4px 0;">👤 ${c}</div>`).join('')
+    : '<div style="color:var(--text-dim);font-size:12px;">No characters in this shot</div>';
+
+  // Open detail panel
+  document.getElementById('detailPanel').classList.add('open');
+}
+
+function getCameraEmoji(angle) {
+  const map = { wide: '🌄', medium: '🧑', 'close-up': '👁', dolly: '🎥', crane: '🏗', 'over-shoulder': '👥', 'low-angle': '⬆', 'high-angle': '⬇' };
+  return map[angle] ?? '📷';
+}
+
+// ── Shot Selection & Detail Editing ──
+function selectShot(index) {
+  selectedShotIndex = index;
+  render();
+}
+
+function closeDetail() {
+  document.getElementById('detailPanel').classList.remove('open');
+  selectedShotIndex = -1;
+  render();
+}
+
+// Detail field edits
+document.getElementById('detailDesc')?.addEventListener('input', (e) => {
+  if (selectedShotIndex >= 0) timeline.shots[selectedShotIndex].description = e.target.value;
+  renderShotList();
+});
+document.getElementById('detailDialogue')?.addEventListener('input', (e) => {
+  if (selectedShotIndex >= 0) timeline.shots[selectedShotIndex].dialogueHint = e.target.value;
+});
+
+// ── Drag & Drop ──
+let dragIndex = -1;
+function dragStart(e, index) {
+  dragIndex = index;
+  e.dataTransfer.effectAllowed = 'move';
+  e.target.classList.add('dragging');
+}
+function dragOver(e, index) { e.preventDefault(); }
+function dropShot(e, index) {
+  e.preventDefault();
+  if (dragIndex < 0 || dragIndex === index) return;
+  const [shot] = timeline.shots.splice(dragIndex, 1);
+  timeline.shots.splice(index, 0, shot);
+  dragIndex = -1;
+  render();
+}
+
+// ── Playback ──
+function togglePlay() {
+  isPlaying = !isPlaying;
+  const btn = document.getElementById('playBtn');
+  btn.textContent = isPlaying ? '⏸' : '▶';
+  btn.classList.toggle('playing', isPlaying);
+
+  if (isPlaying) {
+    const start = performance.now() - playbackTime * 1000;
+    playInterval = setInterval(() => {
+      playbackTime = (performance.now() - start) / 1000;
+      if (playbackTime >= timeline.totalDurationSec) {
+        playbackTime = 0;
+        if (!playInterval) return;
+      }
+      updatePlayhead();
+      updateTimeDisplay();
+    }, 1000 / 30);
+  } else {
+    clearInterval(playInterval);
+    playInterval = null;
+  }
+}
+
+function skipBack() { playbackTime = 0; updatePlayhead(); updateTimeDisplay(); }
+function skipForward() { playbackTime = timeline.totalDurationSec; updatePlayhead(); updateTimeDisplay(); }
+
+function updatePlayhead() {
+  const total = timeline.totalDurationSec || 1;
+  const track = document.getElementById('videoTrack');
+  const pxPerSec = (track.offsetWidth - 20) / total;
+  const left = playbackTime * pxPerSec;
+  document.getElementById('playhead').style.left = `${left}px`;
+  document.getElementById('playheadAudio').style.left = `${left}px`;
+}
+
+function updateTimeDisplay() {
+  document.getElementById('currentTime').textContent = formatTime(playbackTime);
+}
+
+function updateTotalTime() {
+  document.getElementById('totalTime').textContent = formatTime(timeline.totalDurationSec);
+}
+
+function updateShotCount() {
+  document.getElementById('shotCount').textContent = `${timeline.shots.length} shots`;
+}
+
+// ── Import / Export ──
+function exportTimeline() {
+  const blob = new Blob([JSON.stringify(timeline, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `${timeline.title.replace(/\s+/g, '_')}_timeline.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importTimeline() {
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = '.json';
+  input.onchange = (e) => {
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        timeline = JSON.parse(ev.target.result);
+        selectedShotIndex = -1;
+        playbackTime = 0;
+        render();
+      } catch (err) { alert('Invalid JSON: ' + err.message); }
+    };
+    reader.readAsText(e.target.files[0]);
+  };
+  input.click();
+}
+
+function loadDemo() {
+  timeline = JSON.parse(JSON.stringify(DEMO));
+  // Calculate offsets
+  let offset = 0;
+  for (const s of timeline.shots) { s.startOffset = offset; offset += s.durationSec; }
+  timeline.totalDurationSec = offset;
+  selectedShotIndex = 0;
+  playbackTime = 0;
+  render();
+  renderDetail();
+}
+
+// ── Utilities ──
+function formatTime(sec) {
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${String(m).padStart(2, '0')}:${s.toFixed(1).padStart(4, '0')}`;
+}
+
+// ── Keyboard shortcuts ──
+document.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') return;
+  if (e.code === 'Space') { e.preventDefault(); togglePlay(); }
+  if (e.code === 'ArrowLeft') { playbackTime = Math.max(0, playbackTime - 1); updatePlayhead(); updateTimeDisplay(); }
+  if (e.code === 'ArrowRight') { playbackTime = Math.min(timeline.totalDurationSec, playbackTime + 1); updatePlayhead(); updateTimeDisplay(); }
+  if (e.code === 'Delete' && selectedShotIndex >= 0) {
+    timeline.shots.splice(selectedShotIndex, 1);
+    selectedShotIndex = Math.min(selectedShotIndex, timeline.shots.length - 1);
+    render();
+  }
+  if (e.code === 'Escape') closeDetail();
+});
+
+// Resize handler
+window.addEventListener('resize', () => { renderTimeline(); });
+
+// Auto-load demo on first visit
+loadDemo();
+</script>
+</body>
+</html>
