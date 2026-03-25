@@ -95,7 +95,7 @@ export async function produce(opts) {
         {
           voiceId: c.voice?.elevenLabsVoiceId,
           stability: c.voice?.stability ?? 0.5,
-          similarity: c.voice?.similarityBoost ?? 0.75,
+          similarity: c.voice?.similarity ?? 0.75,
           modelId: 'eleven_multilingual_v2',
         },
       ]));

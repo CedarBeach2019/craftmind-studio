@@ -13,6 +13,7 @@
  * @property {string}  voice.elevenLabsVoiceId  — ElevenLabs voice ID
  * @property {string}  voice.emotionStyle        — "dramatic" | "deadpan" | "warm" | "intense"
  * @property {number}  voice.stability           — Voice stability (0-1)
+ * @property {number}  [voice.similarity]        — Similarity boost (0-1, default 0.75)
  * @property {string[]} catchphrases  — Recurring lines or verbal tics
  * @property {string[]} avoids       — Topics they avoid
  * @property {string[]} backstory    — Key past events

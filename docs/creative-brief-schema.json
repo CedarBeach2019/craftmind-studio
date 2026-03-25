@@ -1,0 +1,77 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "CraftMind Studio — Creative Brief",
+  "description": "Input format for the Director AI to generate shot lists. Defines story, characters, mood, and production constraints.",
+  "type": "object",
+  "required": ["premise", "characters", "mood"],
+  "properties": {
+    "premise": {
+      "type": "string",
+      "description": "Core story idea or logline. Should be vivid and specific.",
+      "minLength": 10,
+      "maxLength": 2000,
+      "examples": [
+        "Alex discovers an abandoned village at sunset. Strange sounds echo from the well at the center of town."
+      ]
+    },
+    "characters": {
+      "type": "array",
+      "description": "Character IDs involved in the story. Must match registered CharacterProfile IDs.",
+      "items": { "type": "string" },
+      "minItems": 1,
+      "examples": [["alex", "jordan"]]
+    },
+    "mood": {
+      "type": "string",
+      "description": "Overall emotional tone of the production.",
+      "enum": ["mysterious", "dramatic", "comedic", "suspenseful", "melancholy", "triumphant", "romantic", "horror", "whimsical", "epic", "neutral"],
+      "examples": ["suspenseful"]
+    },
+    "targetDurationSec": {
+      "type": "number",
+      "description": "Desired total runtime in seconds (default: 300).",
+      "minimum": 10,
+      "maximum": 3600,
+      "default": 300
+    },
+    "setting": {
+      "type": "string",
+      "description": "Optional location/world description for world-building context.",
+      "examples": ["Dense jungle biome at golden hour", "Abandoned nether fortress"]
+    },
+    "genre": {
+      "type": "string",
+      "description": "Optional genre tag for style guidance.",
+      "enum": ["action", "adventure", "comedy", "drama", "horror", "mystery", "romance", "sci-fi", "fantasy", "thriller", "documentary"]
+    },
+    "beatStructure": {
+      "type": "string",
+      "description": "Narrative structure to follow (default: save-the-cat).",
+      "enum": ["save-the-cat", "three-act", "hero-journey", "five-act"],
+      "default": "save-the-cat"
+    },
+    "cameraStyle": {
+      "type": "string",
+      "description": "Preferred camera language.",
+      "enum": ["dynamic", "static", "documentary", "noir", "epic-wide", "intimate"],
+      "default": "dynamic"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Additional director's notes or specific requests."
+    }
+  },
+  "examples": [
+    {
+      "premise": "Alex discovers an abandoned village at sunset. Strange sounds echo from the well at the center of town.",
+      "characters": ["alex", "jordan"],
+      "mood": "mysterious",
+      "targetDurationSec": 180,
+      "setting": "Plains biome, abandoned village, golden hour lighting",
+      "genre": "horror",
+      "beatStructure": "save-the-cat",
+      "cameraStyle": "suspenseful",
+      "notes": "Use lots of crane and dolly shots. Save the reveal for the midpoint."
+    }
+  ]
+}
