@@ -398,6 +398,18 @@ async function main() {
   }
 }
 
+/**
+ * Register studio features with CraftMind Core.
+ * @param {object} core - Core instance with registerPlugin()
+ */
+export function registerWithCore(core) {
+  core.registerPlugin('studio', {
+    name: 'CraftMind Studio',
+    version: '1.0.0',
+    modules: { produce, startServer, generateShotList, StudioLot, StarRegistry, Production, StudioFinance, AwardCeremony },
+  });
+}
+
 // Run CLI if executed directly
 const isDirectRun = process.argv[1]?.endsWith('index.js');
 if (isDirectRun) main();
