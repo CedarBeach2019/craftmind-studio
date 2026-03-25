@@ -200,3 +200,29 @@ async function buildTimeline(scenes, brief) {
   }
   return tl;
 }
+
+// ── Crisis & Era Extensions ──────────────────────────────────────────
+
+/**
+ * Check if the director is experiencing a creative block.
+ */
+export function checkDirectorBlock(genre, eraSystem) {
+  if (Math.random() < 0.1) {
+    return {
+      blocked: true,
+      suggestion: eraSystem
+        ? `Consider using ${eraSystem.era.sets.slice(-2).join(' or ')} sets from the ${eraSystem.era.name}.`
+        : 'Try a different genre or take a break.',
+    };
+  }
+  return { blocked: false, suggestion: '' };
+}
+
+/**
+ * Get era-appropriate suggestions for the director.
+ */
+export function getEraSuggestions(eraSystem) {
+  if (!eraSystem) return [];
+  const era = eraSystem.era;
+  return [`🎬 ${era.name} — ${era.description}`];
+}

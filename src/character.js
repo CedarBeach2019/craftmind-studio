@@ -173,6 +173,51 @@ export function getContinuitySummary(characterId) {
   return `${profile.name} (${profile.currentMood}). Relationships: ${rels}. Recent: ${mems.map(m => m.summary).join(' → ')}`;
 }
 
+// ── Star System Integration ───────────────────────────────────────────
+
+/**
+ * Promote a registered CharacterProfile to a Star (studio tycoon layer).
+ * Adds mood, stress, salary, career arc, genre talent.
+ *
+ * @param {string} characterId
+ * @param {object} [starOpts] — Partial Star constructor options
+ * @returns {import('./star-system.js').Star}
+ */
+export async function promoteToStar(characterId, starOpts = {}) {
+  const profile = registry.get(characterId);
+  if (!profile) throw new Error(`Character "${characterId}" not found`);
+
+  const { Star } = await import('./star-system.js');
+  const star = new Star({
+    id: profile.id,
+    name: profile.name,
+    personality: starOpts.personality ?? 'professional',
+    talent: starOpts.talent ?? {},
+    mood: starOpts.mood ?? 70,
+    stress: starOpts.stress ?? 20,
+    popularity: starOpts.popularity ?? 30,
+    salary: starOpts.salary ?? 100,
+    ...starOpts,
+  });
+  return star;
+}
+
+/**
+ * Sync a Star's mood back to its CharacterProfile.
+ *
+ * @param {import('./star-system.js').Star} star
+ */
+export function syncStarToCharacter(star) {
+  const profile = registry.get(star.id);
+  if (!profile) return;
+  const moodMap = { 80: 'elated', 60: 'happy', 40: 'neutral', 20: 'anxious', 0: 'miserable' };
+  let mood = 'neutral';
+  for (const [threshold, label] of Object.entries(moodMap)) {
+    if (star.mood >= Number(threshold)) { mood = label; break; }
+  }
+  profile.currentMood = mood;
+}
+
 // ── Serialization ─────────────────────────────────────────────────────
 
 /**

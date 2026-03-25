@@ -21,6 +21,16 @@ import { generateStoryboard, generatePanel, renderPanel, renderStoryboard } from
 import { TakeManager } from './takes.js';
 import { applyTransition, applyTimelineTransitions, addTitleCard, addCredits, applyLetterbox, exportVideo, QUALITY_PRESETS, ASPECT_RATIOS } from './post-production.js';
 import { generateSoundPlan, getAmbientForBiome, getFootstepForBlock, getSoundsForMob, getSoundLibrary } from './sound-design.js';
+import { StudioLot, BUILDING_TYPES, ADJACENCY_BONUSES } from './studio-lot.js';
+import { Star, StarRegistry, PERSONALITY_TYPES, CAREER_PHASES, GENRES } from './star-system.js';
+import { Production, STAGES, STAGE_ORDER } from './production-pipeline.js';
+import { StudioFinance } from './finance.js';
+import { AwardCeremony, AWARD_CATEGORIES } from './awards.js';
+import { EraSystem, ERAS } from './era-progression.js';
+import { CrisisSystem, CRISIS_TYPES } from './crisis-events.js';
+import { AudienceSystem } from './audience.js';
+import { CompetitorStudio, CompetitorLeague } from './competitor-studios.js';
+import { DailyRoutine, TIME_PHASES, PHASE_ORDER } from './daily-routine.js';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import { createServer } from 'node:http';
@@ -44,6 +54,17 @@ export {
   applyTransition, applyTimelineTransitions, addTitleCard, addCredits, applyLetterbox, exportVideo,
   QUALITY_PRESETS, ASPECT_RATIOS,
   generateSoundPlan, getAmbientForBiome, getFootstepForBlock, getSoundsForMob, getSoundLibrary,
+  // Studio Tycoon modules
+  StudioLot, BUILDING_TYPES, ADJACENCY_BONUSES,
+  Star, StarRegistry, PERSONALITY_TYPES, CAREER_PHASES, GENRES,
+  Production, STAGES, STAGE_ORDER,
+  StudioFinance,
+  AwardCeremony, AWARD_CATEGORIES,
+  EraSystem, ERAS,
+  CrisisSystem, CRISIS_TYPES,
+  AudienceSystem,
+  CompetitorStudio, CompetitorLeague,
+  DailyRoutine, TIME_PHASES, PHASE_ORDER,
 };
 
 // ── Web UI Server ──────────────────────────────────────────────────────
