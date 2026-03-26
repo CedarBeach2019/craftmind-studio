@@ -7,3 +7,4 @@ output/
 frames/
  recordings/
 .DS_Store
+assets/generated/
