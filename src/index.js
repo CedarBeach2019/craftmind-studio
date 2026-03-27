@@ -37,6 +37,9 @@ import { StudioInteractionResolver } from './ai/studio-interactions.js';
 import { StudioStoryGenerator } from './ai/studio-story-generator.js';
 import { DirectingEvaluator } from './ai/directing-evaluator.js';
 import { ScriptEvolverStudio } from './ai/script-evolver-studio.js';
+import { ReplayRecorder, createReplayRecorder } from './replay.js';
+import { AIDirector, createAIDirector } from './ai-director.js';
+import { HighlightReel, createHighlightReel } from './highlights.js';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import { createServer } from 'node:http';
@@ -78,6 +81,10 @@ export {
   StudioStoryGenerator,
   DirectingEvaluator,
   ScriptEvolverStudio,
+  // Replay & AI Director modules
+  ReplayRecorder, createReplayRecorder,
+  AIDirector, createAIDirector,
+  HighlightReel, createHighlightReel,
 };
 
 // ── Web UI Server ──────────────────────────────────────────────────────
